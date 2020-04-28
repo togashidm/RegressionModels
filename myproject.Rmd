@@ -1,0 +1,199 @@
+---
+output:
+  pdf_document:
+    fig_caption: yes
+    fig_height: 4
+  html_document: default
+---
+
+---
+geometry: margin=1.8cm
+fontsize: 10pt
+output: pdf_document
+---
+#"Is an automatic or manual transmission better for car MPG ?"
+\rule{\textwidth}{1pt}
+#####by *DT*
+\setlength{\parskip}{-0.2em}
+
+\setlength{\baselineskip}{1em}
+\linespread{1}
+
+```{r global_options, include=FALSE, echo=FALSE}
+    require(knitr)
+    opts_chunk$set(fig.path='figs/', echo=FALSE, warning=FALSE,
+                   message=FALSE,results='markup', strip.white = TRUE, collapse=TRUE, tidy = FALSE)
+```
+##1. Summary
+Motor Trend magazine is interested to find out the relationship between a set of variables and MPG (outcome). Basically, the company is interested to answer two questions: 1) *"Is an automatic or manual transmission better for MPG"* and 2) *"Quantify the MPG difference between automatic and manual transmissions"*. By using the `mtcars` data set we are going to answer those questions by making an exploratory data analyses and proposing various regression models between the data set variables. Residual and diagnostic analysis are made to help to choose the best regression model.  
+
+##2. Exploratory data analysis
+We start by loading some important libraries and data set, and also taking a look into the data
+```{r, echo=TRUE, highlight=TRUE}
+library(ggplot2); library(GGally); require(datasets); data(mtcars); head(mtcars,3); 
+class(mtcars); dim(mtcars)
+```
+###2.1. About *mtcars* data set:
+The data set `mtcars` is a data frame with 32 observations on 11 variables. The variables definition can be found by running `?mtcars` and it is reproduced in Table 1 (see Appendix). Note that "vs" and "am" are binary variables, and three are also categorical variables, e.g., "cyl", "gear", and "carb".
+
+###2.2. About the variables:
+We can verify correlations between "mpg" (outcome) against the other variables (predictors) and also against the variables theimselves by making a pair wise correlation. An exploratory plot in Fig. 1 (see Appendix) is built, where it is color code by the type of transmission. 
+The two most important features in the plot are the correlation between "mpg" and other variables shown by the linear model (first row, left to right) and the correlation values for those linear models(first column, top to bottom). It is important to note that the results in the Fig. 1 are unadjusted, i.e., paired linear relationships and not a multivariable regression. We can now make a mutivariable model considering "mpg" as outcome and the other variables as predictors.
+```{r,echo=TRUE, include=FALSE}
+lm_all <- lm(mpg ~ factor(cyl) + I(disp-mean(disp)) + I(hp-mean(hp)) + I(wt-mean(wt)) +
+                    I(drat-mean(drat)) + I(qsec-mean(qsec)) + factor(vs) + factor(am) + 
+                    factor(gear) + factor(carb), data=mtcars); round(summary(lm_all)$coef,3)
+#selected model
+lm8 <- lm(mpg ~ I(hp-mean(hp)) + factor(am), data=mtcars)
+```
+
+###2.3. Linear Models
+The first and simplest model (lm0) is to consider that "mpg" is only depending on "am", that is, a simple linear regression. The result is in the plot in Fig. 1 (the 3rd one in the first row from the right side). So, a positive increase in "mpg" is observed from automatic to manual transmission. However, if we look at the correlation between both (the 3rd one in the first column from the bottom) is not so strong (ca. 0.6). Also, calculating the $R^2$ ( = `r round(summary(lm(mpg ~ factor(am), data=mtcars))$r.squared,4)`) means that only 36% of the variation is explained by this model. At the other extreme, we can consider a model with *all* variables, by calling lm_all model (see in Appendix).
+A quick interpretation of the coefficients is made by taking "cyl" as example. Its coefficient is ca. -2.65. This means that if the other predictors are kept constant, for **every unit increase** in "cyl" (in this case from 4 to 6) there will be a **decrease** in "mpg" by 2.65 units. The intercept is interpreted by being "mpg" value when all the predictions are null or at the lowest level for the factors. This may not make sense for some of variables, for instance, there is no "zero" value for "hp", or for "gear", and so on. This situation is avoided if the model in centered to the mean values.Therefore, the intercept is now related to the mean for those variables that were centered. Although, the $R^2$ value is `r round(summary(lm_all)$r.squared,4)` and is higher than the first model (extra 9 variables), the test hypothesis of relationship between the predictors and miles per gallon failed to reject the *null* hypothesis. The *null* hypothesis is that all coefficients equal zero. All P-values are higher than 0.05 and hence for this model that consider all the predictors we failed to reject the *null* hypothesis (see Appendix for the values). "Simpson's" paradox can be observed,for instance, on the coefficients obtained in the lm_all model, the signal of displacement variable ("disp") is positive, but in Fig 1. the slope is negative against "mpg". The same is observed for some other variables.
+
+##3. Linear Models - Model selection
+Diferent models are tested and the best one is considered here if it is able to answer the proposed questions, and It is robust and simple (small number of variables). The strategy of model selection applied here is as follows: (1) Starting with the model with full predictors (lm_all); (2) Using function `vif` to calculate variance inflation factor of the predictors; (3) Creating a new model without the predictor with the highest *VIF* on the previous model; (4) Repeating tasks (2) and (3) until the minimum number of predictors is achieved(i.e., two), or until "am" predictor is prevalent. (5) Perfoming ANOVA on the nested models. The code is in the appendix (unfortunatelly no space to show the results for all the tested models). 
+Note that in all tested models positive values for "am" coefficient were found. However the t-test of coefficients of "am" predictor  showed that we failed to the reject *null* hypothesis, **except for the linear models lm6, lm7** and **lm8**. We can perfom a nested model analysis using ANOVA, starting with the simplest model (lm0), then lm8, lm7 and lm6 (see Appendix). From the results, the extra addition of predictor for model lm8 (Model 2 in the result), i.e., "vs" make P-value above of $\alpha$ = 0.05. Therefore, lm8 with "am" and "hp" as predictors presented as the best model. 
+
+##4. Residual plot and diagnostic
+The diagnostic analysis is made by using `dfbetas` and `hatvalues` functions on the choosen model. Some of car models were selected based also on Residual plot (Fig.2 in the Appendix), and the `dfbetas` and `hatvalues` calculated.
+```{r,echo=TRUE}
+res<-cbind(round(dfbetas(lm8)[,2:3],3),hatvalues=round(hatvalues(lm8),3))[c(18:21,28:31),]
+colnames(res)<- c('dfbeta.hp','dfbeta.am','hatvalues'); res
+```
+Note that Maserati Bora has high influence on coefficients and high leverage values than the other cars. Toyota Corolla also has a high influence but relatively low leverage. Lotus has high influence only in the second coefficient ("am") but low leverage. Similar results are also observed in the Residuals plot. Furthermore, the residual Q-Q plot(top rigth, Fig.2) shows a normality of the errors from lm8 model where the points fall over a diagonal line. 
+
+##5. Conclusions
+Model the coeficients of model lm8 is shown below:
+```{r,echo=TRUE, highlight=TRUE, include=TRUE}
+round(summary(lm8)$coef,5)
+```
+All the coefficients are significant at $\alpha$= 0.05. So, we can reject the *null* hypothesis. The confidence intervals can be also determined, at the same $\alpha$ level.
+```{r,echo=TRUE, highlight=TRUE, include=TRUE}
+sumCoef <- summary(lm8)$coef
+intercept <- round((sumCoef[1,1]+c(-1,1)*qt(.975,df=lm8$df)*sumCoef[1,2]),2)
+hp.slope <- round((sumCoef[2,1]+c(-1,1)*qt(.975,df=lm8$df)*sumCoef[2,2]),2)
+am.slope <- round((sumCoef[3,1]+c(-1,1)*qt(.975,df=lm8$df)*sumCoef[3,2]),2)
+intercept 
+hp.slope
+am.slope
+```
+Assuming that the best model is linear with additive independent and indentical distributed errors and also by treating `mtcars` dataset as a population, we found that manual transmission is better than automatic. Therefore, if "hp" is kept constant, the change from automatic to manual transmission increases "mpg"" by a factor of *ca.* (5.3 +/- 2.2) the value estimated for the intercept change ("mpg") from automatic transmission to manual transmission.
+\clearpage
+\setlength{\parskip}{-0.5em}
+\renewcommand{\baselinestretch}{0}
+\setlength{\baselineskip}{-2em}
+\linespread{0.8}
+
+#Appendix
+\rule{\textwidth}{1pt}  
+\setlength{\arrayrulewidth}{0.3mm}
+\begin{table}[ht]
+\caption{mtcars variables definition} 
+\begin{center}
+\begin{tabular}{ l l  } 
+\hline
+ Variable & Definition \\ [0.3ex] 
+\hline
+ mpg & Miles/(US) gallon \\ [0.2ex] 
+ cyl & Number of cylinders \\ [0.2ex] 
+ disp & Displacement (cu.in.) \\ [0.2ex] 
+ hp & Gross horsepower \\ [0.2ex] 
+ drat & Rear axle ratio \\ [0.2ex] 
+ wt & Weight (lb/1000) \\ [0.2ex] 
+ qsec & 1/4 mile time \\ [0.2ex] 
+ vs & V/S (0 means a V-engine, and 1 straight engine) \\ [0.2ex] 
+ am & Transmission (0 = automatic, 1 = manual) \\ [0.2ex] 
+ gear & Number of forward gears \\ [0.2ex] 
+ carb & Number of carburetors \\ [0.3ex] 
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+##Linear Models
+Linear model lm0    : Only "am"
+```{r,echo=TRUE, highlight=TRUE, include=TRUE}
+lm0 <-lm(mpg ~ factor(am), data=mtcars); round(summary(lm0)$coef,3)
+```
+
+Linear model lm_all : All predictors
+```{r,echo=FALSE, highlight=TRUE, include=FALSE}
+lm_all <- lm(mpg ~ factor(cyl) + I(disp-mean(disp)) + I(hp-mean(hp)) + I(wt-mean(wt)) +
+                    I(drat-mean(drat)) + I(qsec-mean(qsec)) + factor(vs) + factor(am) + 
+                    factor(gear) + factor(carb), data=mtcars); 
+```
+
+```{r,echo=TRUE, highlight=TRUE, include=TRUE}
+round(summary(lm_all)$coef,3)
+```
+Variance Inflation factor for lm_all
+```{r,echo=TRUE, highlight=TRUE, include=TRUE}
+require(car)            # if you don't have the package run: install.packages("car")
+round(vif(lm_all),3)
+```
+- Linear Model lm1 : Eliminating the highest vif value, in this case it is "carb"
+- Linear Model lm2 : Eliminating the highest vif value, in this case it is "cyl"
+- Linear Model lm3 : Eliminating the highest vif value, in this case it is "gear"
+- Linear Model lm4 : Eliminating the highest vif value, in this case it is "disp"
+- Linear Model lm5 : Eliminating the highest vif value, in this case it is "qsec"
+- Linear Model lm6 : Eliminating the highest vif value, in this case it is "wt"
+- Linear Model lm7 : Eliminating the highest vif value, in this case it is "drat"
+- Linear Model lm8 : Eliminating the highest vif value, in this case it is "vs"
+```{r,echo=FALSE, highlight=TRUE, results='hide', include=FALSE}
+round(vif(lm_all),3)    # eliminate the highest vif value, in this case it is "carb"
+lm1 <- lm(mpg ~ factor(cyl) + I(disp-mean(disp)) + I(hp-mean(hp)) + I(wt-mean(wt)) + 
+                I(drat-mean(drat)) + I(qsec-mean(qsec)) + factor(vs) + factor(am) +
+                factor(gear), data=mtcars)
+round(summary(lm1)$coef,3)
+
+round(vif(lm1),3)       # eliminate the highest vif value, in this case it is "cyl"
+lm2 <- lm(mpg ~ I(disp-mean(disp)) + I(hp-mean(hp)) + I(wt-mean(wt)) + I(drat-mean(drat)) +
+                I(qsec-mean(qsec)) + factor(vs) + factor(am) + factor(gear), data=mtcars)
+round(summary(lm2)$coef,3)
+
+round(vif(lm2),3)       # eliminate the highest vif value, in this case it is "gear"
+lm3 <- lm(mpg ~ I(disp-mean(disp)) + I(hp-mean(hp)) + I(wt-mean(wt)) + 
+                I(drat-mean(drat)) + I(qsec-mean(qsec)) + factor(vs) + factor(am), data=mtcars)
+round(summary(lm3)$coef,3)
+
+round(vif(lm3),3)       # eliminate the highest vif value, in this case it is "disp"
+lm4 <- lm(mpg ~ I(hp-mean(hp)) + I(wt-mean(wt)) + I(drat-mean(drat)) + I(qsec-mean(qsec)) + 
+                factor(vs) + factor(am), data=mtcars)
+round(summary(lm4)$coef,3)
+
+round(vif(lm4),3)       # eliminate the highest vif value, in this case it is "qsec"
+lm5 <- lm(mpg ~ I(hp-mean(hp)) + I(wt-mean(wt)) + I(drat-mean(drat)) + factor(vs) + 
+                factor(am), data=mtcars)
+round(summary(lm5)$coef,3)
+
+round(vif(lm5),3)       # eliminate the highest vif value, in this case it is "wt"
+lm6 <- lm(mpg ~ I(hp-mean(hp)) + I(drat-mean(drat)) + factor(vs) + factor(am), data=mtcars)
+round(summary(lm6)$coef,3)
+
+round(vif(lm6),3)       # eliminate the highest vif value, in this case it is "drat"
+lm7 <- lm(mpg ~ I(hp-mean(hp)) + factor(vs) + factor(am), data=mtcars)
+round(summary(lm7)$coef,3)
+
+round(vif(lm7),3)       # eliminate the highest vif value, in this case it is "vs"
+lm8 <- lm(mpg ~ I(hp-mean(hp)) + factor(am), data=mtcars)
+round(summary(lm8)$coef,3)
+```
+**ANOVA** for 4 nested models
+```{r,,echo=TRUE, highlight=TRUE, tidy=TRUE}
+round(anova(lm0,lm8,lm7,lm6),3)
+```
+```{r fig1, fig.width=5.1, fig.height=5.1, fig.cap= "*Plot of the correlations of mtcars variables. Red color for automatic and Green color for manual*"}
+ggpairs(data=mtcars, 
+        lower = list(continuous = 'cor',params=c(size=3)),
+        upper = list(continuous = "smooth", params = c(method = "lm",
+                    aes(colour=mtcars$am+2,size=1,alpha=0.4))),
+        diag = list(continuous = 'bar', params=c(aes(fill = I("steelblue")))),
+        axisLabels="none") + ggplot2::theme_bw()+ggplot2::theme(axis.text = element_blank())
+```
+   
+```{r fig2, fig.width=8, fig.height=8, fig.cap= "*Residuals analysis Plot of mtcars data of linear model 8.*"}
+par(mfrow=c(2,2)); plot(lm8, pch=16)
+```
+
+
+\clearpage
